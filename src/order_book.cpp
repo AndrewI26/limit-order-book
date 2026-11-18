@@ -1,7 +1,19 @@
 #include "order_book.hpp"
 
 bool OrderBook::add(OrderId id, Side side, Price price, Qty qty) {
+  auto add_to_side = [&](auto& levels) -> bool {
+    Level& level = levels[price];
+    level.orders.emplace_back(id, side, price, qty);
+    level.qty += qty;
+    level.count++;
+    return true;
+  };
 
+  if (side == Side::Buy) {
+    add_to_side(bids_);
+  } else {
+    add_to_side(asks_);
+  }
 };
 
 bool OrderBook::cancel(OrderId id) {

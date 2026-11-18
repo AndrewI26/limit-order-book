@@ -1,18 +1,32 @@
-#include <cstdint>
+#include <list>
+#include <map>
 #include <optional>
-#include <vector>
 
 using OrderId = std::uint64_t;
 using Price = std::uint64_t;
 using Qty = std::uint64_t;
+using LevelQueue = std::list<Order>;
 
 enum class Side : std::uint8_t { Buy, Sell };
 
 struct Level {
-  Price price;
+  LevelQueue orders;
   Qty qty;             // Total resting quantity at this price.
   std::uint32_t count; // Number of orders at this price.
   bool operator==(const Level&) const = default;
+};
+
+struct Order {
+  OrderId id;
+  Side side;
+  Price price;
+  Qty qty;
+};
+
+struct OrderLocator {
+  Side side;
+  Price price;
+  LevelQueue::iterator it;
 };
 
 class OrderBook {
@@ -35,4 +49,11 @@ public:
   Qty volume_at(Side side, Price price) const;
   std::vector<Level> depth(Side side, std::size_t n) const; // best first
   std::size_t order_count() const;
+
+private:
+  // Stores the levels
+  std::map<Price, Level, std::greater<Price>> bids_;
+  std::map<Price, Level> asks_;
+
+  std::unordered_map<OrderId, OrderLocator> orders_;
 };
