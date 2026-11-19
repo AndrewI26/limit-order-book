@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <map>
@@ -23,7 +24,10 @@ struct Order {
   Qty qty;
 };
 using LevelQueue = std::list<Order>;
-using OrderLocation = LevelQueue::iterator;
+struct OrderLocation {
+  LevelQueue::iterator it;
+  LevelQueue* orders;
+};
 
 struct Level {
   LevelQueue orders;

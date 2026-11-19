@@ -13,9 +13,11 @@ bool OrderBook::add(const OrderId id, const Side side, const Price price,
 
   auto add_to_side = [&](auto& levels) -> bool {
     Level& level = levels[price];
-    auto& order = level.orders.emplace_back(id, side, price, qty);
+    orderbook::Order& order = level.orders.emplace_back(id, side, price, qty);
 
-    orders_[id] = level.orders.end();
+    auto order_it = std::prev(level.orders.end());
+
+    orders_[id] = {order_it, &level.orders};
     level.qty += qty;
     level.count++;
     return true;
@@ -28,7 +30,15 @@ bool OrderBook::add(const OrderId id, const Side side, const Price price,
   }
 }
 
-bool OrderBook::cancel(const OrderId id) {}
+bool OrderBook::cancel(const OrderId id) {
+  if (!orders_.contains(id)) return false;
+
+  OrderLocation order_loc = orders_[id];
+  order_loc.orders->erase(order_loc.it);
+  orders_.erase(id);
+
+  return true;
+}
 
 bool OrderBook::reduce(const OrderId id, const Qty by) {}
 

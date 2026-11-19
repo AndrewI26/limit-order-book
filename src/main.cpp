@@ -19,4 +19,9 @@ int main() {
   orderBook->add(8, orderbook::Side::Sell, 10, 5);
 
   out << *orderBook;
+
+  orderBook->cancel(1);
+  orderBook->cancel(2);
+
+  out << *orderBook;
 }
