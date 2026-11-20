@@ -11,7 +11,7 @@
 
 namespace orderbook {
 
-enum class Side : std::uint8_t { kBuy, kSell };
+enum class Side : std::uint8_t { Buy, Sell };
 
 using OrderId = std::uint64_t;
 using Price = std::uint64_t;
@@ -52,8 +52,9 @@ class OrderBook {
 
   std::optional<Level> BestBid() const;
   std::optional<Level> BestAsk() const;
-  std::optional<OrderId> Front(
-      const Side side) const;  // next order to be filled
+
+  // Next order to be filled.
+  std::optional<OrderId> Front(const Side side) const;
   Qty VolumeAt(const Side side, const Price price) const;
   std::vector<Level> Depth(const Side side,
                            const std::size_t n) const;  // best first
@@ -62,6 +63,10 @@ class OrderBook {
   friend std::ostream& operator<<(std::ostream& out, const OrderBook& ob);
 
  private:
+  // Unlinks the order at `it` from its level, updating the level's totals and
+  // erasing the level if it becomes empty. Does not touch `orders_`.
+  void RemoveFromLevel(LevelQueue::iterator it);
+
   // Stores the levels
   std::map<Price, Level, std::greater<Price>> bids_;
   std::map<Price, Level> asks_;

@@ -1,0 +1,14 @@
+---
+
+# Tests inherit the project config, minus checks that misfire on GoogleTest
+
+# - TEST() macros register tests through static initializers
+
+# - Tests read optionals right after ASSERT_TRUE(x.has_value()), or rely on a
+
+# crash to fail the test, which the analyzer can't see
+
+InheritParentConfig: true
+Checks: >
+  -bugprone-throwing-static-initialization,
+  -bugprone-unchecked-optional-access

@@ -23,6 +23,11 @@ if [[ -z "$tidy" ]]; then
 fi
 
 flags=(-std=c++20 -I.)
+# GoogleTest headers, so tests/ can be analysed too.
+if command -v pkg-config >/dev/null 2>&1; then
+  # shellcheck disable=SC2207  # Intentional word splitting of compiler flags.
+  flags+=($(pkg-config --cflags gtest 2>/dev/null || true))
+fi
 if [[ "$(uname)" == "Darwin" ]]; then
   flags+=(-isysroot "$(xcrun --show-sdk-path)")
 fi

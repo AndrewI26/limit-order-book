@@ -7,7 +7,15 @@ BUILD_DIR = build
 TARGET    = lob
 SRCS      = src/main.cpp src/order_book.cpp
 OBJS      = $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
-DEPS      = $(OBJS:.o=.d)
+
+# Tests (GoogleTest, found via pkg-config)
+TEST_BIN  = $(BUILD_DIR)/order_book_test
+TEST_SRCS = tests/order_book_test.cpp
+TEST_OBJS = $(TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
+GTEST_CFLAGS := $(shell pkg-config --cflags gtest_main 2>/dev/null)
+GTEST_LIBS   := $(shell pkg-config --libs gtest_main 2>/dev/null)
+
+DEPS      = $(OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
 all: $(TARGET)
 
@@ -17,6 +25,19 @@ $(TARGET): $(OBJS)
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(TEST_OBJS): CXXFLAGS += $(GTEST_CFLAGS)
+
+$(TEST_BIN): $(TEST_OBJS) $(BUILD_DIR)/src/order_book.o
+	@if [ -z "$(GTEST_LIBS)" ]; then \
+	  echo "GoogleTest not found via pkg-config. See CONTRIBUTING.md." >&2; \
+	  exit 1; \
+	fi
+	$(CXX) $(LDFLAGS) -o $@ $^ $(GTEST_LIBS)
+
+## test: Build and run the GoogleTest suite
+test: $(TEST_BIN)
+	./$(TEST_BIN)
 
 -include $(DEPS)
 
@@ -47,4 +68,4 @@ help:
 	@echo "  clean    Remove build artifacts"
 	@grep -hE '^## ' $(firstword $(MAKEFILE_LIST)) | sed -E 's/^## ([a-z-]+): /  \1\t/' | expand -t 11
 
-.PHONY: all clean setup format lint check help
+.PHONY: all clean test setup format lint check help
