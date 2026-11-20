@@ -1,1 +1,7 @@
+---
+
+# Google C++ Style Guide: <https://google.github.io/styleguide/cppguide.html>
+
+Language: Cpp
 BasedOnStyle: Google
+Standard: c++20
