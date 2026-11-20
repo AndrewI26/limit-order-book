@@ -23,11 +23,6 @@ $(BUILD_DIR)/%.o: %.cpp
 clean:
 	rm -rf $(BUILD_DIR)
 
-# ---- Style (Google C++ Style Guide) -----------------------------------------
-# These use the same pinned tool versions as the git hooks in
-# .pre-commit-config.yaml. They only see files tracked by git, so `git add`
-# new files first.
-
 ## setup: Install the pre-commit git hooks (run once after cloning)
 setup:
 	pre-commit install
