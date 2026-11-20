@@ -1,2 +1,9 @@
 # limit-order-book
-Simple limit order book implementation in C++20!
+
+Simple order book program in C++.
+
+## Benchmarks
+
+Intial implimentation on branch TODO.
+Benchmark that implimentation.
+Explain how I made quicker TODO.
