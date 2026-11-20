@@ -42,9 +42,37 @@ bool OrderBook::cancel(const OrderId id) {
 
 bool OrderBook::reduce(const OrderId id, const Qty by) {}
 
-std::optional<Level> OrderBook::best_bid() const {}
-std::optional<Level> OrderBook::best_ask() const {}
-std::optional<OrderId> OrderBook::front(const Side side) const {}
+std::optional<Level> OrderBook::best_bid() const {
+  if (bids_.size() == 0) {
+    return std::nullopt;
+  } else {
+    return bids_.begin()->second;
+  }
+}
+
+std::optional<Level> OrderBook::best_ask() const {
+  if (asks_.size() == 0) {
+    return std::nullopt;
+  } else {
+    return asks_.begin()->second;
+  }
+}
+
+std::optional<OrderId> OrderBook::front(const Side side) const {
+  if (side == Side::Buy) {
+    if (auto lowest_ask = best_ask()) {
+      auto front_order = lowest_ask->orders.front();
+      return front_order.id;
+    }
+  }
+  if (side == Side::Sell) {
+    if (auto highest_bid = best_bid()) {
+      auto front_order = highest_bid->orders.front();
+      return front_order.id;
+    }
+  }
+}
+
 Qty OrderBook::volume_at(const Side side, const Price price) const {}
 std::vector<Level> OrderBook::depth(const Side side,
                                     const std::size_t n) const {}

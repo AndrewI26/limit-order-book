@@ -23,5 +23,10 @@ int main() {
   orderBook->cancel(1);
   orderBook->cancel(2);
 
+  orderBook->front(orderbook::Side::Buy);
+
+  orderBook->best_ask();
+  orderBook->best_bid();
+
   out << *orderBook;
 }
