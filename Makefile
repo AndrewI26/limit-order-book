@@ -8,19 +8,43 @@ TARGET    = lob
 SRCS      = src/main.cpp src/order_book.cpp
 OBJS      = $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Tests (GoogleTest, found via pkg-config)
 TEST_BIN  = $(BUILD_DIR)/order_book_test
 TEST_SRCS = tests/order_book_test.cpp
 TEST_OBJS = $(TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 GTEST_CFLAGS := $(shell pkg-config --cflags gtest_main 2>/dev/null)
 GTEST_LIBS   := $(shell pkg-config --libs gtest_main 2>/dev/null)
 
-DEPS      = $(OBJS:.o=.d) $(TEST_OBJS:.o=.d)
+RELEASE_DIR      = $(BUILD_DIR)/release
+ARCH_FLAGS      ?= -march=native
+RELEASE_CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -O3 -DNDEBUG \
+                   $(ARCH_FLAGS) -I.
+RELEASE_OBJS     = $(SRCS:%.cpp=$(RELEASE_DIR)/%.o)
+RELEASE_BIN      = $(RELEASE_DIR)/$(TARGET)
+
+BENCH_BIN    = $(RELEASE_DIR)/order_book_bench
+BENCH_SRCS   = bench/order_book_bench.cpp
+BENCH_OBJS   = $(BENCH_SRCS:%.cpp=$(RELEASE_DIR)/%.o)
+BENCH_CFLAGS := $(shell pkg-config --cflags benchmark 2>/dev/null)
+BENCH_LIBS   := $(shell pkg-config --libs benchmark 2>/dev/null)
+BENCH_ARGS  ?=
+
+DEPS      = $(OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(RELEASE_OBJS:.o=.d) \
+            $(BENCH_OBJS:.o=.d)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(LDFLAGS) -o $@ $^
+
+## release: Build an optimised ./build/release/lob (-O3, for benchmarking)
+release: $(RELEASE_BIN)
+
+$(RELEASE_BIN): $(RELEASE_OBJS)
+	$(CXX) $(LDFLAGS) -o $@ $^
+
+$(RELEASE_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(RELEASE_CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
@@ -39,6 +63,21 @@ $(TEST_BIN): $(TEST_OBJS) $(BUILD_DIR)/src/order_book.o
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
+# Benchmarks are always built with the optimised release flags.
+$(BENCH_OBJS): RELEASE_CXXFLAGS += $(BENCH_CFLAGS)
+
+$(BENCH_BIN): $(BENCH_OBJS) $(RELEASE_DIR)/src/order_book.o
+	@if [ -z "$(BENCH_LIBS)" ]; then \
+	  echo "Google Benchmark not found via pkg-config. See CONTRIBUTING.md." >&2; \
+	  exit 1; \
+	fi
+	$(CXX) $(LDFLAGS) -o $@ $^ $(BENCH_LIBS)
+
+## bench: Build (optimised) and run the benchmarks; pass flags
+#   with BENCH_ARGS, e.g. make bench BENCH_ARGS=--benchmark_filter=Add
+bench: $(BENCH_BIN)
+	./$(BENCH_BIN) $(BENCH_ARGS)
+
 -include $(DEPS)
 
 clean:
@@ -49,8 +88,12 @@ setup:
 	pre-commit install
 
 ## format: Reformat all C++ sources in place with clang-format
+# Passes every C++ file git knows about plus untracked ones (minus anything
+# gitignored), so new files are formatted before you `git add` them.
+CXX_FILES = $(shell git ls-files --cached --others --exclude-standard \
+              '*.cpp' '*.hpp' '*.cc' '*.h')
 format:
-	@pre-commit run clang-format --all-files || true
+	@pre-commit run clang-format --files $(CXX_FILES) || true
 
 ## lint: Run cpplint and clang-tidy
 lint:
@@ -68,4 +111,4 @@ help:
 	@echo "  clean    Remove build artifacts"
 	@grep -hE '^## ' $(firstword $(MAKEFILE_LIST)) | sed -E 's/^## ([a-z-]+): /  \1\t/' | expand -t 11
 
-.PHONY: all clean test setup format lint check help
+.PHONY: all release clean test bench setup format lint check help

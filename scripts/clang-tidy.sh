@@ -27,6 +27,8 @@ flags=(-std=c++20 -I.)
 if command -v pkg-config >/dev/null 2>&1; then
   # shellcheck disable=SC2207  # Intentional word splitting of compiler flags.
   flags+=($(pkg-config --cflags gtest 2>/dev/null || true))
+  # shellcheck disable=SC2207
+  flags+=($(pkg-config --cflags benchmark 2>/dev/null || true))
 fi
 if [[ "$(uname)" == "Darwin" ]]; then
   flags+=(-isysroot "$(xcrun --show-sdk-path)")
