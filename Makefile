@@ -78,6 +78,24 @@ $(BENCH_BIN): $(BENCH_OBJS) $(RELEASE_DIR)/src/order_book.o
 bench: $(BENCH_BIN)
 	./$(BENCH_BIN) $(BENCH_ARGS)
 
+## bench-save: Run benchmarks (10 reps) and save to bench/results/NAME.json
+BENCH_RESULTS_DIR = bench/results
+BENCH_REPS       ?= 10
+bench-save: $(BENCH_BIN)
+	@if [ -z "$(NAME)" ]; then \
+	  echo "Usage: make bench-save NAME=v1" >&2; exit 1; \
+	fi
+	@if [ -e "$(BENCH_RESULTS_DIR)/$(NAME).json" ] && [ -z "$(FORCE)" ]; then \
+	  echo "$(BENCH_RESULTS_DIR)/$(NAME).json exists; use FORCE=1 to overwrite." >&2; \
+	  exit 1; \
+	fi
+	@mkdir -p $(BENCH_RESULTS_DIR)
+	./$(BENCH_BIN) --benchmark_repetitions=$(BENCH_REPS) \
+	  --benchmark_report_aggregates_only=true \
+	  --benchmark_out=$(BENCH_RESULTS_DIR)/$(NAME).json \
+	  --benchmark_out_format=json $(BENCH_ARGS)
+	@echo "Saved $(BENCH_RESULTS_DIR)/$(NAME).json"
+
 -include $(DEPS)
 
 clean:
@@ -111,4 +129,4 @@ help:
 	@echo "  clean    Remove build artifacts"
 	@grep -hE '^## ' $(firstword $(MAKEFILE_LIST)) | sed -E 's/^## ([a-z-]+): /  \1\t/' | expand -t 11
 
-.PHONY: all release clean test bench setup format lint check help
+.PHONY: all release clean test bench bench-save setup format lint check help
