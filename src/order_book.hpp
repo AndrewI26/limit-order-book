@@ -23,6 +23,15 @@ struct Order {
   Price price;
   Qty qty;
 };
+// A fill between an incoming (taker) order and a resting (maker) order.
+struct Trade {
+  OrderId taker_id;
+  OrderId maker_id;
+  Price price;  // Always the maker's (resting) price.
+  Qty qty;
+  bool operator==(const Trade&) const = default;
+};
+
 using LevelQueue = std::list<Order>;
 struct OrderLocation {
   LevelQueue::iterator it;
@@ -38,9 +47,18 @@ struct Level {
 
 class OrderBook {
  public:
-  // Add a resting limit order at the back of its price level's queue.
-  // Returns false (and changes nothing) if `id` already exists or qty <= 0.
-  bool Add(const OrderId id, const Side side, const Price price, const Qty qty);
+  // Submit a limit order. It first matches against the opposite side of the
+  // book while prices cross (a buy at or above the best ask, a sell at or
+  // below the best bid), filling resting orders in price-time priority at
+  // their resting price. Any remaining quantity rests at the back of its price
+  // level's queue.
+  //
+  // If `trades` is non-null, each fill is appended to it in execution order.
+  // Returns false (and changes nothing) if `id` is already resting or
+  // qty <= 0. An order that fills completely never rests, so its id is not
+  // retained.
+  bool Add(const OrderId id, const Side side, const Price price, const Qty qty,
+           std::vector<Trade>* trades = nullptr);
 
   // Remove an order entirely. Returns false if `id` is unknown.
   bool Cancel(const OrderId id);
@@ -50,19 +68,30 @@ class OrderBook {
   // is removed.
   bool Reduce(const OrderId id, const Qty by);
 
-  std::optional<Level> BestBid() const;
-  std::optional<Level> BestAsk() const;
+  // The best (highest) bid / best (lowest) ask level, or nullptr if that side
+  // is empty. These point into the book: they are invalidated by any call that
+  // modifies it (Add, Cancel, Reduce).
+  const Level* BestBid() const;
+  const Level* BestAsk() const;
 
   // Next order to be filled.
   std::optional<OrderId> Front(const Side side) const;
   Qty VolumeAt(const Side side, const Price price) const;
-  std::vector<Level> Depth(const Side side,
-                           const std::size_t n) const;  // best first
+
+  // Up to `n` levels on `side`, best price first. Like BestBid/BestAsk, the
+  // pointers are invalidated by any modifying call.
+  std::vector<const Level*> Depth(const Side side, const std::size_t n) const;
   std::size_t OrderCount() const;
 
   friend std::ostream& operator<<(std::ostream& out, const OrderBook& ob);
 
  private:
+  // Fills `id` against `levels` (the opposite side) while `crosses(level
+  // price)` holds. Returns the quantity left unfilled.
+  template <typename Levels, typename Crosses>
+  Qty Match(OrderId id, Qty qty, Levels& levels, Crosses crosses,
+            std::vector<Trade>* trades);
+
   // Unlinks the order at `it` from its level, updating the level's totals and
   // erasing the level if it becomes empty. Does not touch `orders_`.
   void RemoveFromLevel(LevelQueue::iterator it);

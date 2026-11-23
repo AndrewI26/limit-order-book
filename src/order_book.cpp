@@ -6,28 +6,66 @@
 
 namespace orderbook {
 
+template <typename Levels, typename Crosses>
+Qty OrderBook::Match(const OrderId id, Qty qty, Levels& levels, Crosses crosses,
+                     std::vector<Trade>* trades) {
+  // Levels are ordered best price first, so walk from the front.
+  while (qty > 0 && !levels.empty()) {
+    auto level_it = levels.begin();
+    if (!crosses(level_it->first)) break;
+
+    Level& level = level_it->second;
+    while (qty > 0 && !level.orders.empty()) {
+      Order& maker = level.orders.front();
+      const Qty fill = std::min(qty, maker.qty);
+      if (trades != nullptr) {
+        trades->push_back({id, maker.id, maker.price, fill});
+      }
+
+      qty -= fill;
+      maker.qty -= fill;
+      level.qty -= fill;
+      if (maker.qty == 0) {
+        orders_.erase(maker.id);
+        level.orders.pop_front();
+        level.count--;
+      }
+    }
+    if (level.orders.empty()) levels.erase(level_it);
+  }
+  return qty;
+}
+
 bool OrderBook::Add(const OrderId id, const Side side, const Price price,
-                    const Qty qty) {
+                    const Qty qty, std::vector<Trade>* trades) {
   if (qty == 0 || orders_.contains(id)) {
     return false;
   }
 
-  auto add_to_side = [&](auto& levels) -> bool {
+  const Qty remaining =
+      side == Side::Buy
+          ? Match(
+                id, qty, asks_, [price](Price ask) { return ask <= price; },
+                trades)
+          : Match(
+                id, qty, bids_, [price](Price bid) { return bid >= price; },
+                trades);
+  if (remaining == 0) return true;
+
+  auto rest_on_side = [&](auto& levels) {
     Level& level = levels[price];
-    level.orders.emplace_back(id, side, price, qty);
-
-    auto order_it = std::prev(level.orders.end());
-
-    orders_[id] = {order_it, &level.orders};
-    level.qty += qty;
+    level.orders.emplace_back(id, side, price, remaining);
+    orders_[id] = {std::prev(level.orders.end()), &level.orders};
+    level.qty += remaining;
     level.count++;
-    return true;
   };
 
   if (side == Side::Buy) {
-    return add_to_side(bids_);
+    rest_on_side(bids_);
+  } else {
+    rest_on_side(asks_);
   }
-  return add_to_side(asks_);
+  return true;
 }
 
 void OrderBook::RemoveFromLevel(LevelQueue::iterator it) {
@@ -80,36 +118,18 @@ bool OrderBook::Reduce(const OrderId id, const Qty by) {
   return true;
 }
 
-std::optional<Level> OrderBook::BestBid() const {
-  if (bids_.size() == 0) {
-    return std::nullopt;
-  } else {
-    return bids_.begin()->second;
-  }
+const Level* OrderBook::BestBid() const {
+  return bids_.empty() ? nullptr : &bids_.begin()->second;
 }
 
-std::optional<Level> OrderBook::BestAsk() const {
-  if (asks_.size() == 0) {
-    return std::nullopt;
-  } else {
-    return asks_.begin()->second;
-  }
+const Level* OrderBook::BestAsk() const {
+  return asks_.empty() ? nullptr : &asks_.begin()->second;
 }
 
 std::optional<OrderId> OrderBook::Front(const Side side) const {
-  if (side == Side::Buy) {
-    if (auto lowest_ask = BestAsk()) {
-      auto front_order = lowest_ask->orders.front();
-      return front_order.id;
-    }
-  }
-  if (side == Side::Sell) {
-    if (auto highest_bid = BestBid()) {
-      auto front_order = highest_bid->orders.front();
-      return front_order.id;
-    }
-  }
-  return std::nullopt;
+  const Level* level = side == Side::Buy ? BestAsk() : BestBid();
+  if (level == nullptr) return std::nullopt;
+  return level->orders.front().id;
 }
 
 Qty OrderBook::VolumeAt(const Side side, const Price price) const {
@@ -122,15 +142,15 @@ Qty OrderBook::VolumeAt(const Side side, const Price price) const {
   return volume_on_side(asks_);
 }
 
-std::vector<Level> OrderBook::Depth(const Side side,
-                                    const std::size_t n) const {
+std::vector<const Level*> OrderBook::Depth(const Side side,
+                                           const std::size_t n) const {
   // Both maps are ordered best price first, so take the first n levels.
   auto depth_on_side = [&](const auto& levels) {
-    std::vector<Level> result;
+    std::vector<const Level*> result;
     result.reserve(std::min(n, levels.size()));
     for (const auto& [price, level] : levels) {
       if (result.size() == n) break;
-      result.push_back(level);
+      result.push_back(&level);
     }
     return result;
   };
