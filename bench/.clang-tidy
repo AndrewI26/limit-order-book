@@ -1,9 +1,14 @@
 ---
-# Benchmarks inherit the project config, adjusted for Google Benchmark:
-# - BENCHMARK() registers functions through static initializers.
-# - Benchmark functions use the library's BM_ naming convention.
+
+# Benchmarks inherit the project config, adjusted for Google Benchmark
+
+# - BENCHMARK() registers functions through static initializers
+
+# - Benchmark functions use the library's BM_ naming convention
+
 InheritParentConfig: true
 Checks: >
   -bugprone-throwing-static-initialization
 CheckOptions:
-  - { key: readability-identifier-naming.FunctionIgnoredRegexp, value: '^BM_.*' }
+
+- { key: readability-identifier-naming.FunctionIgnoredRegexp, value: '^BM_.*' }
